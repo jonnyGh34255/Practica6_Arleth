@@ -1,77 +1,41 @@
-# Automatically generated on 2022-06-03 UTC from https://codemagic.io/app/6298bacb463af718f9a68af2/settings
-# Note that this configuration is not an exact match to UI settings. Review and adjust as necessary.
-
 workflows:
-  default-workflow:
-    name: Default Workflow
+  simple-ios-workflow:
+    name: Simple iOS Workflow
+    instance_type: mac_mini
     max_build_duration: 60
     environment:
-      flutter: 2.5.3
+      flutter: stable
       xcode: latest
       cocoapods: default
-    triggering:
-      events:
-        - push
-      branch_patterns:
-        - pattern: flutter
-          include: true
-          source: true
-        - pattern: '*feature'
-          include: true
-          source: true
-      tag_patterns:
-        - pattern: '*'
-          include: true
     scripts:
-      - |
-        # set up debug keystore
-        rm -f ~/.android/debug.keystore
-        keytool -genkeypair \
-          -alias androiddebugkey \
-          -keypass android \
-          -keystore ~/.android/debug.keystore \
-          -storepass android \
-          -dname 'CN=Android Debug,O=Android,C=US' \
-          -keyalg 'RSA' \
-          -keysize 2048 \
-          -validity 10000
-      - |
-        # set up local properties
-        echo "flutter.sdk=$HOME/programs/flutter" > "$FCI_BUILD_DIR/android/local.properties"
-      - flutter packages pub get
-      - |
-        #!/usr/bin/env sh
-        set -e # exit on first failed command
+      - name: Set up local properties
+        script: echo "flutter.sdk=$HOME/programs/flutter" > "$CM_BUILD_DIR/android/local.properties"
+      - name: Get Flutter packages
+        script: flutter packages pub get
+      - name: Install Podfiles
+        script: find . -name "Podfile" -execdir pod install \;
+      - name: Build debug iOS app
+        script: flutter build ios --debug --no-codesign
+      
+      - name: Build debug apk
+  script: flutter build apk --debug
+      - name: Get Flutter packages
+  script: flutter packages pub get
+  - name: Flutter analyze
+  script: flutter analyze
+  - name: Flutter unit tests
+  script: flutter test
+  # For Android
+artifacts:
+  - build/**/outputs/**/*.apk
+  - build/**/outputs/**/*.aab
+  - build/**/outputs/**/mapping.txt
+  - flutter_drive.log
 
-        echo $ANDROID_FIREBASE_SECRET | base64 --decode > $CM_BUILD_DIR/android/app/google-services.json
-        echo $IOS_FIREBASE_SECRET | base64 --decode > $CM_BUILD_DIR/ios/Runner/GoogleService-Info.plist
-      - flutter build appbundle --debug
-      - find . -name "Podfile" -execdir pod install \;
-      - flutter build ios --debug -f /main.dart --no-codesign
-      - |
-        - name: Get Flutter packages
-          script: flutter packages pub get
-        - name: Flutter analyze
-          script: flutter analyze
-        - name: Flutter unit tests
-          script: flutter test
-        # Build debug iOS .app
-        - name: Build debug iOS app
-          script: flutter build ios --debug --no-codesign
-        # For iOS
-        artifacts:
-          - build/**/outputs/**/mapping.txt
-          - build/ios/ipa/*.ipa
-          - /tmp/xcodebuild_logs/*.log
-          - flutter_drive.log
     artifacts:
-      - build/**/outputs/apk/**/*.apk
-      - build/**/outputs/bundle/**/*.aab
       - build/**/outputs/**/mapping.txt
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
-      - '*.snap'
-      - build/windows/**/*.msix
       - flutter_drive.log
     publishing:
       email:
